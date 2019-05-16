@@ -2,13 +2,12 @@ using System;
 
 namespace SegmentTree
 {
-    public static class MemoryExtensions
+    public static class SpanExtensions
     {
-        public static Memory<T> SkipWhile<T>(this Memory<T> src, Func<T, bool> pred)
+        public static Span<T> SkipWhile<T>(this Span<T> span, Func<T, bool> pred)
         {
             int i = 0;
-            var span = src.Span;
-            for (; i < src.Length; ++i)
+            for (; i < span.Length; ++i)
             {
                 if (pred(span[i]))
                 {
@@ -16,13 +15,12 @@ namespace SegmentTree
                 }
                 break;
             }
-            return src.Slice(i);
+            return span.Slice(i);
         }
-        public static Memory<T> TakeWhile<T>(this Memory<T> src, Func<T, bool> pred)
+        public static Span<T> TakeWhile<T>(this Span<T> span, Func<T, bool> pred)
         {
             int i = 0;
-            var span = src.Span;
-            for (; i < src.Length; ++i)
+            for (; i < span.Length; ++i)
             {
                 if (pred(span[i]))
                 {
@@ -30,7 +28,7 @@ namespace SegmentTree
                 }
                 break;
             }
-            return src.Slice(0, i);
+            return span.Slice(0, i);
         }
     }
 }

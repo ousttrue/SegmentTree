@@ -1,154 +1,11 @@
 using System;
 using System.Buffers.Text;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 
 namespace SegmentTree.Json
 {
-    public enum JsonValueType
-    {
-        Null,
-        Boolean,
-
-        Number,
-
-        String,
-
-        Array,
-
-        Object,
-    }
-
-    public struct JsonSegment
-    {
-        static Memory<byte> MemoryFromStr(string src)
-        {
-            return Encoding.UTF8.GetBytes(src);
-        }
-        public static readonly Memory<byte> NULL_MEMORY = MemoryFromStr("null");
-        public static readonly Memory<byte> TRUE_MEMORY = MemoryFromStr("true");
-        public static readonly Memory<byte> FALSE_MEMORY = MemoryFromStr("false");
-
-        public readonly Memory<byte> Buffer;
-
-        public JsonSegment(Memory<byte> buffer)
-        {
-            m_childCount = 0;
-            Buffer = buffer;
-        }
-
-        /**
-        * https://www.json.org/
-        */
-        public JsonValueType ValueType
-        {
-            get
-            {
-                var ch = Buffer.Span[0];
-                switch (ch)
-                {
-                    case (byte)'n':
-                        return JsonValueType.Null;
-                    case (byte)'t':
-                    case (byte)'f': // fall through
-                        return JsonValueType.Boolean;
-
-                    case (byte)'-':
-                    case (byte)'0':
-                    case (byte)'1':
-                    case (byte)'2':
-                    case (byte)'3':
-                    case (byte)'4':
-                    case (byte)'5':
-                    case (byte)'6':
-                    case (byte)'7':
-                    case (byte)'8':
-                    case (byte)'9':
-                        return JsonValueType.Number;
-
-                    case (byte)'"':
-                        return JsonValueType.String;
-                }
-                throw new ParseException();
-            }
-        }
-
-        public bool IsNull
-        {
-            get
-            {
-                var t = Buffer.Span;
-                return t.SequenceEqual(NULL_MEMORY.Span);
-            }
-        }
-
-        public bool GetBoolean()
-        {
-            var t = Buffer.Span;
-            if (t.SequenceEqual(TRUE_MEMORY.Span))
-            {
-                return true;
-            }
-            else if (t.SequenceEqual(FALSE_MEMORY.Span))
-            {
-                return false;
-            }
-            else
-            {
-                throw new ParseException();
-            }
-        }
-
-        public Int32 GetInt32()
-        {
-            var t = Buffer.Span;
-            if (Utf8Parser.TryParse(t, out Int32 value, out int _))
-            {
-                return value;
-            }
-            throw new ParseException();
-        }
-
-        public Single GetSingle()
-        {
-            var t = Buffer.Span;
-            if (Utf8Parser.TryParse(t, out Single value, out int _))
-            {
-                return value;
-            }
-            throw new ParseException();
-        }
-
-        public Double GetDouble()
-        {
-            var t = Buffer.Span;
-            if (Utf8Parser.TryParse(t, out Double value, out int _))
-            {
-                return value;
-            }
-            throw new ParseException();
-        }
-
-        #region  Children
-        int m_childCount;
-
-        #region Array
-        public int ArrayCount
-        {
-            get
-            {
-                return m_childCount;
-            }
-        }
-        #endregion
-        #endregion
-
-        public string GetString()
-        {
-            var utf8 = new Utf8StringTmp(Buffer.ToArray());
-            return JsonStringUnquote.Unquote(utf8).ToString();
-        }
-    }
 
     public class JsonParser
     {
@@ -187,11 +44,11 @@ namespace SegmentTree.Json
             return true;
         }
 
-        static bool GetStringToken(Utf8StringTmp src, int start, out int pos)
+        static int FindStringEnd(Byte[] array, int start)
         {
             var target = (Byte)'"';
 
-            var p = new Utf8Iterator(src.Bytes, start);
+            var p = new Utf8Iterator(array, start + 1);
             while (p.MoveNext())
             {
                 var b = p.Current;
@@ -201,8 +58,7 @@ namespace SegmentTree.Json
                     if (b == target/*'\"'*/)
                     {
                         // closed
-                        pos = p.BytePosition;
-                        return true;
+                        return p.BytePosition;
                     }
                     else if (b == '\\')
                     {
@@ -230,64 +86,157 @@ namespace SegmentTree.Json
                                 break;
 
                             default:
-                                // unkonw escape
+                                // unknown escape
                                 throw new ParseException("unknown escape: " + p.Second);
                         }
                     }
                 }
             }
 
-            pos = -1;
-            return false;
+            return -1;
         }
 
-
-        public static Memory<byte> GetToken(Memory<byte> src)
+        public struct Token
         {
-            src = src.SkipWhile(b => IsSpace(b));
+            public readonly int Offset;
+            public readonly int Count;
 
-            var first = src.Span[0];
-            switch (first)
+            public Token(int offset, int count)
             {
-                case (byte)'[': // array
-                    throw new NotImplementedException();
+                Offset = offset;
+                Count = count;
+            }
 
-                case (byte)'{': // object
-                    throw new NotImplementedException();
+            public ArraySegment<byte> ToArraySegment(byte[] array)
+            {
+                return new ArraySegment<byte>(array, Offset, Count);
+            }
+        }
 
-                case (byte)'"':
+        public static IEnumerable<Token> Tokenize(ArraySegment<byte> src)
+        {
+            var count = src.Offset + src.Count;
+            int j = src.Offset;
+            while (true)
+            {
+                // skip white space
+                for (; j < count; ++j)
+                {
+                    if (!IsSpace(src.Array[j]))
                     {
-                        if (MemoryMarshal.TryGetArray(src, out ArraySegment<Byte> segment))
+                        break;
+                    }
+                }
+                if (j >= count)
+                {
+                    yield break;
+                }
+
+                var first = src.Array[j];
+                switch (first)
+                {
+                    case (byte)'[': // array
+                    case (byte)']': // array
+                    case (byte)'{': // object
+                    case (byte)'}': // object
+                    case (byte)':': // object
+                    case (byte)',': // array, object
                         {
-                            if (GetStringToken(new Utf8StringTmp(segment), 1, out int pos))
+                            yield return new Token(j, 1);
+                            ++j;
+                        }
+                        break;
+
+                    case (byte)'"':
+                        {
+                            var end = FindStringEnd(src.Array, j);
+                            if (end >= 0)
                             {
-                                return src.Slice(0, pos + 1);
+                                var length = end - j + 1;
+                                yield return new Token(j, length);
+                                j += length;
                             }
                             else
                             {
                                 throw new ParseException("string end not found");
                             }
                         }
-                        else
-                        {
-                            throw new ParseException("?");
-                        }
-                    }
+                        break;
 
-                default:
-                    return src.TakeWhile(b => IsToken(b));
+                    default:
+                        {
+                            var length = 0;
+                            for (; j + length < count; ++length)
+                            {
+                                if (!IsToken(src.Array[j + length]))
+                                {
+                                    break;
+                                }
+                            }
+                            yield return new Token(j, length);
+                            j += length;
+                        }
+                        break;
+                }
             }
         }
 
-        public JsonSegment Parse(Memory<byte> src)
+        Stack<int> m_current = new Stack<int>();
+        List<JsonSegment> m_segments = new List<JsonSegment>();
+
+        public JsonNode Parse(ArraySegment<byte> src)
         {
-            return new JsonSegment(GetToken(src));
+            m_segments.Clear();
+
+            m_current.Clear();
+            m_current.Push(-1); // dummy
+
+            foreach (var token in Tokenize(src))
+            {
+                var head = src.Array[token.Offset];
+                if (head == '[' || head == '{')
+                {
+                    var parentIndex = m_current.Peek();
+                    m_segments.Add(new JsonSegment(parentIndex, token.Offset, token.Count));
+                    if (parentIndex >= 0)
+                    {
+                        m_segments[parentIndex] = m_segments[parentIndex].IncrementChildCount();
+                    }
+                    m_current.Push(m_segments.Count - 1);
+                }
+                else if (head == ']' || head == '}')
+                {
+                    if (m_current.Count <= 1)
+                    {
+                        throw new ParseException("too many close");
+                    }
+                    var parentIndex = m_current.Peek();
+                    m_segments[parentIndex] = m_segments[parentIndex].ExtendTo(token.Offset + 1);
+                    m_current.Pop();
+                }
+                else
+                {
+                    var parentIndex = m_current.Peek();
+                    m_segments.Add(new JsonSegment(parentIndex, token.Offset, token.Count));
+                    if (parentIndex >= 0)
+                    {
+                        m_segments[parentIndex] = m_segments[parentIndex].IncrementChildCount();
+                    }
+                }
+            }
+
+            if (m_current.Count != 1)
+            {
+                throw new ParseException("array or object not closed");
+            }
+
+            return new JsonNode(src.Array, m_segments, 0);
         }
     }
 
     public static class JsonParserExtensions
     {
-        public static JsonSegment Parse(this JsonParser p, string src)
+        public static JsonNode Parse(this JsonParser p, string src)
         {
             var bytes = Encoding.UTF8.GetBytes(src);
             return p.Parse(bytes);

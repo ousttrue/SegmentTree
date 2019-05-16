@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text;
 using SegmentTree.Json;
 using Xunit;
@@ -74,9 +75,9 @@ namespace SegmentTree.Tests
             {
                 var encoding = new UTF8Encoding(false);
                 var quoted = " \"fuga\\n  hoge\" ";
-                var src = encoding.GetBytes(quoted).AsMemory();
-                var token = JsonParser.GetToken(src);
-                Assert.Equal("\"fuga\\n  hoge\"", encoding.GetString(token.ToArray()));
+                var src = encoding.GetBytes(quoted);
+                var token = JsonParser.Tokenize(new ArraySegment<byte>(src)).First();
+                Assert.Equal("\"fuga\\n  hoge\"", encoding.GetString(token.ToArraySegment(src)));
             }
 
             var p = new JsonParser();
