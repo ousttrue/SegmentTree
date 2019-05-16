@@ -5,10 +5,6 @@ using System.Text;
 
 namespace SegmentTree.Json
 {
-    public class JsonParseException : Exception
-    {
-    }
-
     public enum JsonValueType
     {
         Null,
@@ -40,6 +36,9 @@ namespace SegmentTree.Json
             Buffer = buffer;
         }
 
+        /**
+        * https://www.json.org/
+        */
         public JsonValueType ValueType
         {
             get
@@ -65,8 +64,11 @@ namespace SegmentTree.Json
                     case (byte)'8':
                     case (byte)'9':
                         return JsonValueType.Number;
+
+                    case (byte)'"':
+                        return JsonValueType.String;
                 }
-                throw new JsonParseException();
+                throw new ParseException();
             }
         }
 
@@ -92,7 +94,7 @@ namespace SegmentTree.Json
             }
             else
             {
-                throw new JsonParseException();
+                throw new ParseException();
             }
         }
 
@@ -103,7 +105,7 @@ namespace SegmentTree.Json
             {
                 return value;
             }
-            throw new JsonParseException();
+            throw new ParseException();
         }
 
         public Single GetSingle()
@@ -113,7 +115,7 @@ namespace SegmentTree.Json
             {
                 return value;
             }
-            throw new JsonParseException();
+            throw new ParseException();
         }
 
         public Double GetDouble()
@@ -123,7 +125,13 @@ namespace SegmentTree.Json
             {
                 return value;
             }
-            throw new JsonParseException();
+            throw new ParseException();
+        }
+
+        public string GetString()
+        {
+            var utf8 = new Utf8StringTmp(Buffer.ToArray());
+            return JsonStringUnquote.Unquote(utf8).ToString();
         }
     }
 
@@ -162,10 +170,123 @@ namespace SegmentTree.Json
             return false;
         }
 
+        /**
+         * null, true, false  or number
+         */
+        static bool IsToken(byte b)
+        {
+            if (IsSpace(b))
+            {
+                return false;
+            }
+
+            // delimiter
+            switch (b)
+            {
+                case (byte)',':
+                case (byte)']':
+                case (byte)'}':
+                    return false;
+            }
+
+            return true;
+        }
+
+        static bool GetStringToken(Utf8StringTmp src, int start, out int pos)
+        {
+            var target = (Byte)'"';
+
+            var p = new Utf8Iterator(src.Bytes, start);
+            while (p.MoveNext())
+            {
+                var b = p.Current;
+                if (b <= 0x7F)
+                {
+                    // ascii
+                    if (b == target/*'\"'*/)
+                    {
+                        // closed
+                        pos = p.BytePosition;
+                        return true;
+                    }
+                    else if (b == '\\')
+                    {
+                        // escaped
+                        switch ((char)p.Second)
+                        {
+                            case '"': // fall through
+                            case '\\': // fall through
+                            case '/': // fall through
+                            case 'b': // fall through
+                            case 'f': // fall through
+                            case 'n': // fall through
+                            case 'r': // fall through
+                            case 't': // fall through
+                                      // skip next
+                                p.MoveNext();
+                                break;
+
+                            case 'u': // unicode
+                                      // skip next 4
+                                p.MoveNext();
+                                p.MoveNext();
+                                p.MoveNext();
+                                p.MoveNext();
+                                break;
+
+                            default:
+                                // unkonw escape
+                                throw new ParseException("unknown escape: " + p.Second);
+                        }
+                    }
+                }
+            }
+
+            pos = -1;
+            return false;
+        }
+
+
+        static Memory<byte> GetToken(Memory<byte> src)
+        {
+            src = src.SkipWhile(b => IsSpace(b));
+
+            var first = src.Span[0];
+            switch (first)
+            {
+                case (byte)'[': // array
+                    throw new NotImplementedException();
+
+                case (byte)'{': // object
+                    throw new NotImplementedException();
+
+                case (byte)'"':
+                    {
+                        if (MemoryMarshal.TryGetArray(src, out ArraySegment<Byte> segment))
+                        {
+                            if (GetStringToken(new Utf8StringTmp(segment), 1, out int pos))
+                            {
+                                return src.Slice(0, pos + 1);
+                            }
+                            else
+                            {
+                                throw new ParseException("string end not found");
+                            }
+                        }
+                        else
+                        {
+                            throw new ParseException("?");
+                        }
+                    }
+
+                default:
+                    return src.TakeWhile(b => IsToken(b));
+            }
+        }
+
         public JsonSegment Parse(Memory<byte> src)
         {
-            src = src.SkipWhile(b => IsSpace(b)).TakeWhile(b => !IsSpace(b));
-            return new JsonSegment(src);
+            return new JsonSegment(GetToken(src));
         }
     }
 

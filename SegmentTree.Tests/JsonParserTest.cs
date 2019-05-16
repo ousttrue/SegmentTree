@@ -41,7 +41,7 @@ namespace SegmentTree.Tests
                 var parsed = p.Parse("1");
                 Assert.Equal(JsonValueType.Number, parsed.ValueType);
                 Assert.Equal(1, parsed.GetInt32());
-                Assert.ThrowsAny<JsonParseException>(() => parsed.GetBoolean());
+                Assert.ThrowsAny<ParseException>(() => parsed.GetBoolean());
             }
             {
                 var parsed = p.Parse(" 22 ");
@@ -65,6 +65,29 @@ namespace SegmentTree.Tests
                 Assert.Equal(JsonValueType.Number, parsed.ValueType);
                 Assert.Equal(-5e-4, parsed.GetDouble());
                 Assert.Equal(-5, parsed.GetInt32());
+            }
+        }
+
+        [Fact]
+        public void TestString()
+        {
+            var p = new JsonParser();
+            {
+                var value = "hoge";
+                var quoted = "\"hoge\"";
+                Assert.Equal(quoted, JsonStringQuote.Quote(value));
+                var parsed = p.Parse(quoted);
+                Assert.Equal(JsonValueType.String, parsed.ValueType);
+                Assert.Equal("hoge", parsed.GetString());
+            }
+
+            {
+                var value = "fuga\n  hoge";
+                var quoted = "\"fuga\\n  hoge\"";
+                Assert.Equal(quoted, JsonStringQuote.Quote(value));
+                var parsed = p.Parse(quoted);
+                Assert.Equal(JsonValueType.String, parsed.ValueType);
+                Assert.Equal(value, parsed.GetString());
             }
         }
     }
