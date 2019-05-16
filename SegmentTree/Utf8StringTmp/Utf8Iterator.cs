@@ -7,11 +7,11 @@ namespace SegmentTree
 {
     public struct Utf8Iterator : IEnumerator<Byte>
     {
-        Byte[] m_bytes;
-        int m_offset;
-        int m_start;
+        readonly Byte[] m_bytes;
+        readonly int m_offset;
+        readonly int m_start;
         int m_position;
-        int m_end;
+        readonly int m_end;
 
         public Utf8Iterator(ArraySegment<Byte> range, int start = 0)
         {

@@ -150,26 +150,6 @@ namespace SegmentTree.Json
             return false;
         }
 
-        static bool IsNumber(byte b)
-        {
-            switch (b)
-            {
-                case (byte)'-':
-                case (byte)'0':
-                case (byte)'1':
-                case (byte)'2':
-                case (byte)'3':
-                case (byte)'4':
-                case (byte)'5':
-                case (byte)'6':
-                case (byte)'7':
-                case (byte)'8':
-                case (byte)'9':
-                    return true;
-            }
-            return false;
-        }
-
         /**
          * null, true, false  or number
          */

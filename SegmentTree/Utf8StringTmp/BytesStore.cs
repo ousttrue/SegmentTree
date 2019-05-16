@@ -55,7 +55,7 @@ namespace SegmentTree
             m_pos = 0;
         }
 
-        char[] m_c = new char[1];
+        readonly char[] m_c = new char[1];
         public void Write(char c)
         {
             if (c <= 0x7F)
