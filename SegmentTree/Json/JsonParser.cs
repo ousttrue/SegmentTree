@@ -227,7 +227,7 @@ namespace SegmentTree.Json
         }
 
 
-        static Memory<byte> GetToken(Memory<byte> src)
+        public static Memory<byte> GetToken(Memory<byte> src)
         {
             src = src.SkipWhile(b => IsSpace(b));
 

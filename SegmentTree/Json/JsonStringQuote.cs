@@ -3,7 +3,7 @@ using System.Linq;
 using System.Text;
 
 
-namespace SegmentTree
+namespace SegmentTree.Json
 {
     public static class JsonStringQuote
     {

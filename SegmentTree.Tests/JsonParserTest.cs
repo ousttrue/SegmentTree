@@ -71,6 +71,14 @@ namespace SegmentTree.Tests
         [Fact]
         public void TestString()
         {
+            {
+                var encoding = new UTF8Encoding(false);
+                var quoted = " \"fuga\\n  hoge\" ";
+                var src = encoding.GetBytes(quoted).AsMemory();
+                var token = JsonParser.GetToken(src);
+                Assert.Equal("\"fuga\\n  hoge\"", encoding.GetString(token.ToArray()));
+            }
+
             var p = new JsonParser();
             {
                 var value = "hoge";
