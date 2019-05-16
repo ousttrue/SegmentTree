@@ -184,6 +184,15 @@ namespace SegmentTree.Json
         Stack<int> m_current = new Stack<int>();
         List<JsonSegment> m_segments = new List<JsonSegment>();
 
+
+        enum Expect
+        {
+            Value,
+            Colon,
+            CommaOrClose,
+        }
+
+
         public JsonNode Parse(ArraySegment<byte> src)
         {
             m_segments.Clear();
@@ -191,37 +200,94 @@ namespace SegmentTree.Json
             m_current.Clear();
             m_current.Push(-1); // dummy
 
+            var expect = Expect.Value;
+
             foreach (var token in Tokenize(src))
             {
+#if DEBUG
+                var utf8 = new Utf8StringTmp(src.Array, token.Offset, token.Count);
+#endif
                 var head = src.Array[token.Offset];
-                if (head == '[' || head == '{')
+                var parentIndex = m_current.Peek();
+
+                switch (expect)
                 {
-                    var parentIndex = m_current.Peek();
-                    m_segments.Add(new JsonSegment(parentIndex, token.Offset, token.Count));
-                    if (parentIndex >= 0)
-                    {
-                        m_segments[parentIndex] = m_segments[parentIndex].IncrementChildCount();
-                    }
-                    m_current.Push(m_segments.Count - 1);
-                }
-                else if (head == ']' || head == '}')
-                {
-                    if (m_current.Count <= 1)
-                    {
-                        throw new ParseException("too many close");
-                    }
-                    var parentIndex = m_current.Peek();
-                    m_segments[parentIndex] = m_segments[parentIndex].ExtendTo(token.Offset + 1);
-                    m_current.Pop();
-                }
-                else
-                {
-                    var parentIndex = m_current.Peek();
-                    m_segments.Add(new JsonSegment(parentIndex, token.Offset, token.Count));
-                    if (parentIndex >= 0)
-                    {
-                        m_segments[parentIndex] = m_segments[parentIndex].IncrementChildCount();
-                    }
+                    case Expect.Value:
+                        {
+                            if (head == ']' || head == '}')
+                            {
+                                // only empty
+                                if (m_current.Count <= 1)
+                                {
+                                    throw new ParseException("too many close");
+                                }
+                                m_segments[parentIndex] = m_segments[parentIndex].ExtendTo(token.Offset + 1);
+                                var seg = m_segments[parentIndex];
+                                if (seg.ChildCount > 0)
+                                {
+                                    throw new ParseException("value expected: " + (char)head);
+                                }
+                                m_current.Pop();
+                            }
+                            else
+                            {
+                                m_segments.Add(new JsonSegment(parentIndex, token.Offset, token.Count));
+                                if (parentIndex >= 0)
+                                {
+                                    m_segments[parentIndex] = m_segments[parentIndex].IncrementChildCount();
+                                    var seg = m_segments[parentIndex];
+                                    if (src.Array[seg.Offset] == '{' && seg.ChildCount % 2 == 1)
+                                    {
+                                        expect = Expect.Colon;
+                                    }
+                                    else
+                                    {
+                                        expect = Expect.CommaOrClose;
+                                    }
+                                }
+                                if (head == '[' || head == '{')
+                                {
+                                    m_current.Push(m_segments.Count - 1);
+                                    expect = Expect.Value;
+                                }
+                            }
+                        }
+                        break;
+
+                    case Expect.Colon:
+                        {
+                            if (head == ':')
+                            {
+                                expect = Expect.Value;
+                            }
+                            else
+                            {
+                                throw new ParseException(": is expected: " + (char)head);
+                            }
+                        }
+                        break;
+
+                    case Expect.CommaOrClose:
+                        {
+                            if (head == ',')
+                            {
+                                expect = Expect.Value;
+                            }
+                            else if (head == ']' || head == '}')
+                            {
+                                if (m_current.Count <= 1)
+                                {
+                                    throw new ParseException("too many close");
+                                }
+                                m_segments[parentIndex] = m_segments[parentIndex].ExtendTo(token.Offset + 1);
+                                m_current.Pop();
+                            }
+                            else
+                            {
+                                throw new ParseException("comma or ] or } expected: " + (char)head);
+                            }
+                        }
+                        break;
                 }
             }
 

@@ -169,6 +169,41 @@ namespace SegmentTree.Json
             }
         }
 
+        public IEnumerable<JsonNode> AsArray
+        {
+            get
+            {
+                var seg = Segment;
+                var end = seg.Offset + seg.Count;
+                var count = 0;
+                for (var i = m_index + 1; i < end && count < seg.ChildCount; ++i)
+                {
+                    var childSeg = m_segments[i];
+                    if (childSeg.ParentIndex == m_index)
+                    {
+                        yield return new JsonNode(m_bytes, m_segments, i);
+                        ++count;
+                    }
+                }
+            }
+        }
+
+        public JsonNode this[int index]
+        {
+            get
+            {
+                var it = AsArray.GetEnumerator();
+                for (int i = 0; i <= index; ++i)
+                {
+                    if (!it.MoveNext())
+                    {
+                        throw new IndexOutOfRangeException();
+                    }
+                }
+                return it.Current;
+            }
+        }
+
         public int ObjectCount
         {
             get
