@@ -14,7 +14,7 @@ namespace SegmentTree.Json
 
         String,
 
-        List,
+        Array,
 
         Object,
     }
@@ -33,6 +33,7 @@ namespace SegmentTree.Json
 
         public JsonSegment(Memory<byte> buffer)
         {
+            m_childCount = 0;
             Buffer = buffer;
         }
 
@@ -127,6 +128,20 @@ namespace SegmentTree.Json
             }
             throw new ParseException();
         }
+
+        #region  Children
+        int m_childCount;
+
+        #region Array
+        public int ArrayCount
+        {
+            get
+            {
+                return m_childCount;
+            }
+        }
+        #endregion
+        #endregion
 
         public string GetString()
         {

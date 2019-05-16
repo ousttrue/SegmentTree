@@ -98,5 +98,61 @@ namespace SegmentTree.Tests
                 Assert.Equal(value, parsed.GetString());
             }
         }
+
+        [Fact]
+        public void TestArray()
+        {
+            var p = new JsonParser();
+            {
+                var json = "[]";
+                var parsed = p.Parse(json);
+                Assert.Equal(JsonValueType.Array, parsed.ValueType);
+                Assert.Equal(0, parsed.ArrayCount);
+                //kAssert.Equal("[\n]", parsed.ToString("  "));
+            }
+
+            /*
+            {
+                var json = "[1,2,3]";
+                var node = JsonParser.Parse(json);
+                Assert.Equal(0, node.Value.Bytes.Offset);
+
+                //Assert.Catch(() => { var result = node.Value.Bytes.Count; }, "raise exception");
+
+                Assert.True(node.IsArray());
+                Assert.Equal(1, node[0].GetDouble());
+                Assert.Equal(2, node[1].GetDouble());
+                Assert.Equal(3, node[2].GetDouble());
+
+                Assert.Equal("[\n  1,\n  2,\n  3\n]", node.ToString("  "));
+            }
+
+            {
+                var json = "[\"key\",1]";
+                var node = JsonParser.Parse(json);
+                Assert.Equal(0, node.Value.Bytes.Offset);
+
+                //Assert.Catch(() => { var result = node.Value.Bytes.Count; }, "raise exception");
+                Assert.Equal(json.Length, node.Value.Bytes.Count);
+
+                Assert.True(node.IsArray());
+
+                var it = node.ArrayItems().GetEnumerator();
+
+                Assert.IsTrue(it.MoveNext());
+                Assert.Equal("key", it.Current.GetString());
+
+                Assert.IsTrue(it.MoveNext());
+                Assert.Equal(1, it.Current.GetDouble());
+
+                Assert.IsFalse(it.MoveNext());
+
+                Assert.Equal("key", node[0].GetString());
+                Assert.Equal(1, node[1].GetDouble());
+
+                Assert.Equal("[\n  \"key\",\n  1\n]", node.ToString("  "));
+            }
+            */
+        }
     }
 }
