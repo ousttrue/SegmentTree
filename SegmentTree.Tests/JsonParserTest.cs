@@ -70,7 +70,7 @@ namespace SegmentTree.Tests
         }
 
         [Fact]
-        public void TestString()
+        public void TestTokenize()
         {
             {
                 var encoding = new UTF8Encoding(false);
@@ -79,7 +79,11 @@ namespace SegmentTree.Tests
                 var token = JsonParser.Tokenize(new ArraySegment<byte>(src)).First();
                 Assert.Equal("\"fuga\\n  hoge\"", encoding.GetString(token.ToArraySegment(src)));
             }
+        }
 
+        [Fact]
+        public void TestString()
+        {
             var p = new JsonParser();
             {
                 var value = "hoge";
@@ -140,6 +144,71 @@ namespace SegmentTree.Tests
                 Assert.Equal(1, parsed[1].GetDouble());
 
                 //Assert.Equal("[\n  \"key\",\n  1\n]", parsed.ToString("  "));
+            }
+        }
+
+        [Fact]
+        public void TestObject()
+        {
+            var p = new JsonParser();
+            {
+                var json = "{}";
+                var parsed = p.Parse(json);
+                Assert.Equal(JsonValueType.Object, parsed.ValueType);
+                Assert.Equal(0, parsed.AsObject.Count());
+            }
+
+            {
+                var json = "{\"key\":\"value\"}";
+                var parsed = p.Parse(json);
+                Assert.Equal(JsonValueType.Object, parsed.ValueType);
+
+                var it = parsed.AsObject.GetEnumerator();
+
+                Assert.True(it.MoveNext());
+                Assert.Equal("key", it.Current.Key.GetString());
+                Assert.Equal("value", it.Current.Value.GetString());
+
+                Assert.False(it.MoveNext());
+            }
+        }
+
+        [Fact]
+        public void TestNestedObject()
+        {
+            var p = new JsonParser();
+            {
+                var json = "{\"key\":{ \"nestedKey\": \"nestedValue\" }, \"key2\": { \"nestedKey2\": \"nestedValue2\" } }";
+                var parsed = p.Parse(json);
+                Assert.Equal(JsonValueType.Object, parsed.ValueType);
+
+                {
+                    var it = parsed.AsObject.GetEnumerator();
+
+                    Assert.True(it.MoveNext());
+                    Assert.Equal("key", it.Current.Key.GetString());
+                    Assert.Equal(JsonValueType.Object, it.Current.Value.ValueType);
+
+                    Assert.True(it.MoveNext());
+                    Assert.Equal("key2", it.Current.Key.GetString());
+                    Assert.Equal(JsonValueType.Object, it.Current.Value.ValueType);
+
+                    Assert.False(it.MoveNext());
+                }
+
+                var nested = parsed["key2"];
+
+                {
+                    var it = nested.AsObject.GetEnumerator();
+
+                    Assert.True(it.MoveNext());
+                    Assert.Equal("nestedKey2", it.Current.Key.GetString());
+                    Assert.Equal("nestedValue2", it.Current.Value.GetString());
+
+                    Assert.False(it.MoveNext());
+                }
+
+                Assert.Equal("nestedValue2", parsed["key2"]["nestedKey2"].GetString());
             }
         }
     }

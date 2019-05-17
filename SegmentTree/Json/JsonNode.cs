@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Text;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace SegmentTree.Json
@@ -213,6 +214,38 @@ namespace SegmentTree.Json
                     throw new InvalidOperationException("is not object");
                 }
                 return Segment.ChildCount / 2;
+            }
+        }
+
+        public IEnumerable<KeyValuePair<JsonNode, JsonNode>> AsObject
+        {
+            get
+            {
+                var it = AsArray.GetEnumerator();
+                while (true)
+                {
+                    if (!it.MoveNext())
+                    {
+                        yield break;
+                    }
+                    var key = it.Current;
+
+                    if (!it.MoveNext())
+                    {
+                        throw new Exception();
+                    }
+                    var value = it.Current;
+
+                    yield return new KeyValuePair<JsonNode, JsonNode>(key, value);
+                }
+            }
+        }
+
+        public JsonNode this[string key]
+        {
+            get
+            {
+                return AsObject.First(x => x.Key.GetString() == key).Value;
             }
         }
 
