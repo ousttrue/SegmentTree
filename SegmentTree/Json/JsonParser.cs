@@ -185,11 +185,14 @@ namespace SegmentTree.Json
         List<JsonSegment> m_segments = new List<JsonSegment>();
 
 
+        [Flags]
         enum Expect
         {
-            Value,
-            Colon,
-            CommaOrClose,
+            None = 0x00,
+            Value = 0x01,
+            Colon = 0x02,
+            Comma = 0x04,
+            Close = 0x05,
         }
 
 
@@ -210,84 +213,58 @@ namespace SegmentTree.Json
                 var head = src.Array[token.Offset];
                 var parentIndex = m_current.Peek();
 
-                switch (expect)
+                if (head == ']' || head == '}')
                 {
-                    case Expect.Value:
-                        {
-                            if (head == ']' || head == '}')
-                            {
-                                // only empty
-                                if (m_current.Count <= 1)
-                                {
-                                    throw new ParseException("too many close");
-                                }
-                                m_segments[parentIndex] = m_segments[parentIndex].ExtendTo(token.Offset + 1);
-                                var seg = m_segments[parentIndex];
-                                if (seg.ChildCount > 0)
-                                {
-                                    throw new ParseException("value expected: " + (char)head);
-                                }
-                                m_current.Pop();
-                            }
-                            else
-                            {
-                                m_segments.Add(new JsonSegment(parentIndex, token.Offset, token.Count));
-                                if (parentIndex >= 0)
-                                {
-                                    m_segments[parentIndex] = m_segments[parentIndex].IncrementChildCount();
-                                    var seg = m_segments[parentIndex];
-                                    if (src.Array[seg.Offset] == '{' && seg.ChildCount % 2 == 1)
-                                    {
-                                        expect = Expect.Colon;
-                                    }
-                                    else
-                                    {
-                                        expect = Expect.CommaOrClose;
-                                    }
-                                }
-                                if (head == '[' || head == '{')
-                                {
-                                    m_current.Push(m_segments.Count - 1);
-                                    expect = Expect.Value;
-                                }
-                            }
-                        }
-                        break;
+                    // close
+                    if (!expect.HasFlag(Expect.Close))
+                    {
+                        throw new ParseException("close expected: " + (char)head);
+                    }
+                    m_segments[parentIndex] = m_segments[parentIndex].ExtendTo(token.Offset + 1);
+                    m_current.Pop();
+                }
+                else if (head == ':')
+                {
+                    if (!expect.HasFlag(Expect.Colon))
+                    {
+                        throw new ParseException(": is expected: " + (char)head);
+                    }
+                    expect = Expect.Value;
+                }
+                else if (head == ',')
+                {
+                    if (!expect.HasFlag(Expect.Comma))
+                    {
+                        throw new ParseException(", is expected: " + (char)head);
+                    }
+                    expect = Expect.Value;
+                }
+                else
+                {
+                    if (!expect.HasFlag(Expect.Value))
+                    {
+                        throw new ParseException("value expected: " + (char)head);
+                    }
 
-                    case Expect.Colon:
+                    m_segments.Add(new JsonSegment(parentIndex, token.Offset, token.Count));
+                    if (parentIndex >= 0)
+                    {
+                        m_segments[parentIndex] = m_segments[parentIndex].IncrementChildCount();
+                        var seg = m_segments[parentIndex];
+                        if (src.Array[seg.Offset] == '{' && seg.ChildCount % 2 == 1)
                         {
-                            if (head == ':')
-                            {
-                                expect = Expect.Value;
-                            }
-                            else
-                            {
-                                throw new ParseException(": is expected: " + (char)head);
-                            }
+                            expect = Expect.Colon;
                         }
-                        break;
-
-                    case Expect.CommaOrClose:
+                        else
                         {
-                            if (head == ',')
-                            {
-                                expect = Expect.Value;
-                            }
-                            else if (head == ']' || head == '}')
-                            {
-                                if (m_current.Count <= 1)
-                                {
-                                    throw new ParseException("too many close");
-                                }
-                                m_segments[parentIndex] = m_segments[parentIndex].ExtendTo(token.Offset + 1);
-                                m_current.Pop();
-                            }
-                            else
-                            {
-                                throw new ParseException("comma or ] or } expected: " + (char)head);
-                            }
+                            expect = Expect.Comma | Expect.Close;
                         }
-                        break;
+                    }
+                    if (head == '[' || head == '{')
+                    {
+                        m_current.Push(m_segments.Count - 1);
+                        expect = Expect.Value | Expect.Close;
+                    }
                 }
             }
 
